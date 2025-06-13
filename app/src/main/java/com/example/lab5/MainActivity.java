@@ -57,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onDelete(int position) {
                 Log.d("apiXoa", "vị trí: " + position);
-                deleteDistributor(distributorList.get(position).getId(), position);
+                deleteUser(distributorList.get(position).getId(), position);
             }
         });
         recyclerView.setAdapter(distributorAdapter);
@@ -72,10 +72,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         // Gọi API để lấy danh sách user
-        fetchUserList();
+        fetchFruitList();
     }
 
-    private void fetchUserList() {
+    private void fetchFruitList() {
         // Gọi API bằng HttpRequest
         Call<Response<ArrayList<Distributor>>> call = httpRequest.callApi().getListDistributor();
         call.enqueue(new Callback<Response<ArrayList<Distributor>>>() {
@@ -91,6 +91,7 @@ public class MainActivity extends AppCompatActivity {
                         distributorList.addAll(apiResponse.getData());
                         distributorAdapter.notifyDataSetChanged();
                     } else {
+                        Log.d("API", "Lỗi: " + apiResponse.getMessage());
                         Toast.makeText(MainActivity.this, "Lỗi: " + apiResponse.getMessage(),
                                 Toast.LENGTH_SHORT).show();
                     }
@@ -101,6 +102,8 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<Response<ArrayList<Distributor>>> call, Throwable t) {
+                String errorMessage = t.getMessage();
+                Log.e("API_ERROR", "Lỗi kết nối: " + errorMessage, t);
                 Toast.makeText(MainActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
@@ -123,15 +126,19 @@ public class MainActivity extends AppCompatActivity {
         btnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                String username = edDistributorName.getText().toString().trim();
+                String distributorName = edDistributorName.getText().toString().trim();
+                if (distributorName.isEmpty()) {
+                    Toast.makeText(MainActivity.this, "Vui lòng nhập tên nhà phân phối", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 // đối tượng user
                 Distributor newDistributor = new Distributor();
-                newDistributor.setNameDistributor(username);
+                newDistributor.setNameDistributor(distributorName);
 
                 if (distributor == null) {
                     // Thêm user mới
-                    addUser(newDistributor);
+                    addDistributor(newDistributor);
                 } else {
                     // Cập nhật user
                     newDistributor.setId(distributor.getId());
@@ -143,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
         Log.d("Dialog", "Dialog đã tạo");
     }
-    private void addUser(Distributor distributor){
+    private void addDistributor(Distributor distributor){
         Call<Response<Distributor>> call = httpRequest.callApi().addDistributor(distributor);
         call.enqueue(new Callback<Response<Distributor>>() {
             @Override
@@ -151,7 +158,7 @@ public class MainActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null) {
                     Response<Distributor> apiResponse = response.body();
                     if (apiResponse.getStatus() == 200) {
-                        fetchUserList();
+                        fetchFruitList();
                         Toast.makeText(MainActivity.this, "thêm thành công", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(MainActivity.this, "Lỗi: " + apiResponse.getMessage(), Toast.LENGTH_SHORT).show();
@@ -166,61 +173,53 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-    private void updateDistributor(Distributor distributor, int position) {
-        Call<Response<Distributor>> call = httpRequest.callApi().updateDistributor(distributor.getId(), distributor);
+    private void updateDistributor(Distributor user, int position) {
+        Call<Response<Distributor>> call = httpRequest.callApi().updateDistributor(user.getId(), user);
         call.enqueue(new Callback<Response<Distributor>>() {
             @Override
             public void onResponse(Call<Response<Distributor>> call, retrofit2.Response<Response<Distributor>> response) {
                 if (response.isSuccessful() && response.body() != null) {
                     Response<Distributor> apiResponse = response.body();
-                    if (apiResponse.getStatus() == 200 && apiResponse.getData() != null) {
-                        // Tìm vị trí của item cũ và cập nhật nó
-                        for (int i = 0; i < distributorList.size(); i++) {
-                            if (distributorList.get(i).getId().equals(distributor.getId())) {
-                                distributorList.set(i, apiResponse.getData());
-                                distributorAdapter.notifyItemChanged(i);
-                                break;
-                            }
-                        }
-                        Toast.makeText(MainActivity.this, "Sửa thành công", Toast.LENGTH_SHORT).show();
+                    Log.d("apiEdit", "dữ liệu: "+apiResponse.toString());
+                    if (apiResponse.getStatus() == 200) {
+                        fetchFruitList();
+                        Toast.makeText(MainActivity.this, "Cập nhật thành công", Toast.LENGTH_SHORT).show();
                     } else {
-                        String errorMessage = apiResponse.getMessage() != null ? apiResponse.getMessage() : "Cập nhật không thành công";
-                        Log.e("UPDATE_API_ERROR", "Status: " + apiResponse.getStatus() + ", Message: " + apiResponse.getMessage() + ", Data: " + apiResponse.getData());
-                        Toast.makeText(MainActivity.this, "Lỗi: " + errorMessage, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Lỗi: " + apiResponse.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 } else {
-                    Log.e("UPDATE_REQUEST_ERROR", "Response not successful or body is null. Code: " + response.code() + " Message: " + response.message());
-                    Toast.makeText(MainActivity.this, "Lỗi sửa dữ liệu", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Lỗi cập nhật thất bại", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(Call<Response<Distributor>> call, Throwable t) {
-                Log.e("UPDATE_ERROR", "Error: " + t.getMessage());
-                Toast.makeText(MainActivity.this, "Lỗi kết nối: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void deleteDistributor(String id, int position) {
-        Call<Response<Distributor>> call = httpRequest.callApi().deleteDistributor(id);
-        call.enqueue(new Callback<Response<Distributor>>() {
+    private void deleteUser(String id, int position) {
+        Call<Response<Void>> call = httpRequest.callApi().deleteDistributor(id);
+        call.enqueue(new Callback<Response<Void>>() {
             @Override
-            public void onResponse(Call<Response<Distributor>> call, retrofit2.Response<Response<Distributor>> response) {
-                if (response.isSuccessful()) {
-                    // Xóa item khỏi list và cập nhật UI ngay lập tức
-                    distributorList.remove(position);
-                    distributorAdapter.notifyItemRemoved(position);
-                    Toast.makeText(MainActivity.this, "Xóa thành công", Toast.LENGTH_SHORT).show();
+            public void onResponse(Call<Response<Void>> call, retrofit2.Response<Response<Void>> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    Response<Void> apiResponse = response.body();
+                    if (apiResponse.getStatus() == 200) {
+                        fetchFruitList();
+                        Toast.makeText(MainActivity.this, "xóa thành công", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(MainActivity.this, "Lỗi: " + apiResponse.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
                 } else {
-                    Toast.makeText(MainActivity.this, "Lỗi xóa dữ liệu", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "lỗi xóa dữ liệu", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            public void onFailure(Call<Response<Distributor>> call, Throwable t) {
-                Log.e("DELETE_ERROR", "Error: " + t.getMessage());
-                Toast.makeText(MainActivity.this, "Lỗi kết nối: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            public void onFailure(Call<Response<Void>> call, Throwable t) {
+                Toast.makeText(MainActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
